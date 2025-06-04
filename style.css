@@ -1,0 +1,12 @@
+body { margin: 0; background: #111; }
+canvas { display: block; margin: auto; background: #222; }
+#score { color: #fff; text-align: center; font-size: 2em; }
+#gameover { color: #f44; text-align: center; font-size: 2em; display: none; }
+#restart { display: none; margin: 0 auto; }
+#copyright {
+  color: #888;
+  font-size: 0.9em;
+  text-align: center;
+  margin-top: 10px;
+  user-select: none;
+}
