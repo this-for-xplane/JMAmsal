@@ -16,7 +16,7 @@ window.addEventListener('keydown', e => { keyState[e.key.toLowerCase()] = true; 
 window.addEventListener('keyup', e => { keyState[e.key.toLowerCase()] = false; });
 
 function reset() {
-  player = { x: 300, y: 700, r: 20, hp: 1, speed: 1, fireRate: 200, dmg: 1 };
+  player = { x: 300, y: 700, r: 20, hp: 3, maxHp: 3, speed: 1, fireRate: 200, dmg: 1 };
   bullets = [];
   enemies = [];
   score = 0;
@@ -30,12 +30,12 @@ function reset() {
     { name: "공격력 +1", apply: p => p.dmg += 1 },
     { name: "연사속도 ↑", apply: p => p.fireRate = Math.max(80, p.fireRate - 40) },
     { name: "이동속도 +0.5", apply: p => p.speed += 0.5 },
-    { name: "체력 +1", apply: p => p.hp += 1 },
+    { name: "체력 +1", apply: p => { p.maxHp = (p.maxHp||p.hp||3)+1; p.hp = p.maxHp; } },
     { name: "총알 크기 ↑", apply: p => p.bulletSize = (p.bulletSize||5) + 2 },
     { name: "적중시 점수 +2", apply: p => p.scoreBonus = (p.scoreBonus||0) + 2 }
   ];
   scoreDiv.innerText = "점수: 0";
-  expDiv.innerText = `경험치: 0 / ${expToLevelUp} | 레벨: 1`;
+  expDiv.innerText = `경험치: 0 / ${expToLevelUp} | 레벨: 1 | 체력: ${player.hp}/${player.maxHp}`;
   gameoverDiv.style.display = 'none';
   restartBtn.style.display = 'none';
   popup.classList.remove('show');
@@ -119,6 +119,9 @@ function loop() {
   ctx.fillStyle = "#0f8";
   ctx.fill();
 
+  // 체력 표시 (위에 빨간바)
+  drawHpBar();
+
   // 총알 이동+그리기
   bullets.forEach(b => {
     if (b.vx !== undefined && b.vy !== undefined) {
@@ -169,18 +172,45 @@ function loop() {
   for (const e of enemies) {
     const dx = e.x - player.x, dy = e.y - player.y, dist = Math.sqrt(dx*dx+dy*dy);
     if (dist < e.r + player.r) {
+      // 체력 감소
       player.hp -= 1;
+      expDiv.innerText = `경험치: ${exp} / ${expToLevelUp} | 레벨: ${level} | 체력: ${player.hp}/${player.maxHp}`;
+      // 피격시 약간 반짝임 효과(간단히)
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = "#f44";
+      ctx.beginPath();
+      ctx.arc(player.x, player.y, player.r+3, 0, Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+
+      // 만약 체력이 0 이하라면 게임오버
       if(player.hp <= 0) {
         gameOver = true;
         gameoverDiv.style.display = 'block';
         restartBtn.style.display = 'block';
         if(fireTimer) clearInterval(fireTimer);
       }
+      // 적은 부딪힌 뒤 제거
+      enemies.splice(enemies.indexOf(e), 1);
       break;
     }
   }
 
   requestAnimationFrame(loop);
+}
+
+function drawHpBar() {
+  // HP 바 (플레이어 위에 표시)
+  let barW = 40, barH = 6;
+  let pct = player.hp/player.maxHp;
+  ctx.save();
+  ctx.globalAlpha = 0.7;
+  ctx.fillStyle = "#222";
+  ctx.fillRect(player.x-barW/2, player.y-player.r-18, barW, barH);
+  ctx.fillStyle = "#f44";
+  ctx.fillRect(player.x-barW/2, player.y-player.r-18, barW*pct, barH);
+  ctx.restore();
 }
 
 // 경험치 추가 및 레벨업
@@ -191,11 +221,11 @@ function gainExp(amount) {
     exp -= expToLevelUp;
     level += 1;
     expToLevelUp = getLevelUpExp(level);
-    expDiv.innerText = `경험치: ${exp} / ${expToLevelUp} | 레벨: ${level}`;
+    expDiv.innerText = `경험치: ${exp} / ${expToLevelUp} | 레벨: ${level} | 체력: ${player.hp}/${player.maxHp}`;
     if(level > maxLevel) return;
     showLevelUpPopup();
   } else {
-    expDiv.innerText = `경험치: ${exp} / ${expToLevelUp} | 레벨: ${level}`;
+    expDiv.innerText = `경험치: ${exp} / ${expToLevelUp} | 레벨: ${level} | 체력: ${player.hp}/${player.maxHp}`;
   }
 }
 
@@ -217,6 +247,8 @@ function showLevelUpPopup() {
     btn.onclick = () => {
       // 적용
       opt.apply(player);
+      // 체력업일 때 maxHp 증가, hp도 풀로 회복
+      if(opt.name.includes("체력")) player.hp = player.maxHp;
       selectedUpgrades.push(opt.name);
       popup.classList.remove('show');
       if(level < maxLevel) startFiring();
